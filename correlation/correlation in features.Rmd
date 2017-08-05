@@ -1,0 +1,177 @@
+---
+title: "homework1"
+author: "Yihao Song(Allen)"
+date: "2017å¹<b4>5æœ<88>10æ—<a5>"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+# load tain_data
+train_data <- read.csv("G:/kaggle/houseprice/data/train.csv")
+```
+
+
+```{r}
+# get hang of overall
+head(train_data, n = 10)
+str(train_data)
+summary(train_data)
+```
+
+```{r}
+# identify which column contains NA element
+sort(colSums(sapply(train_data, is.na)),decreasing = TRUE)
+```
+
+```{r}
+# deal with NA elements
+# (1) actually missing (2) add new level
+# (3) imputation (4) remove all rows with NA
+```
+
+
+```{r}
+# identify categorical features and numeric ones
+# we assume that if num of unique values of certain variables < 20, 
+# it's also catergorical 
+cat_num <- NULL
+
+for(col in train_data){
+  if(is.factor(col)){
+    cat_num <- c(cat_num,'cat')
+  }else if(length(unique(col)) < 20){ 
+    cat_num <- c(cat_num,"num_cat")
+  }else{
+    cat_num <- c(cat_num,"num")
+  }
+}
+
+# write.table(fea_list,
+          # file = "G:/kaggle/houseprice/House_Price_Feature_List_to_be_filled.csv")
+# train_data_num <- train_data[sapply(train_data, is.numeric)]
+```
+
+```{r}
+# keep record of type of each  variable
+library(xlsx) #load the package
+
+fea_list <- read.xlsx(
+  file = "G:/kaggle/houseprice/House_Price_Feature_List_to_be_filled.xlsx",
+  sheetName = "Sheet1")
+# head(fea_list)
+fea_list$type <- cat_num
+write.csv(fea_list,
+      file = "G:/kaggle/houseprice/House_Price_Feature_List_to_be_filled.csv"
+      )
+```
+
+
+```{r}
+# check above if assign numerical features into categorical 
+colnames(train_data)[cat_num == "num_cat"]
+# head(train_data$BsmtFinSF2,n = 20)
+```
+
+
+```{r}
+# get columns' names
+num_fea_names <- colnames(train_data)[cat_num == "num"][2:23]
+num_cat_names <- colnames(train_data)[cat_num == "num_cat"]
+cat_fea_names <- colnames(train_data)[cat_num == "cat"]
+
+```
+
+
+```{r}
+# get more details, distribution of features
+# for catergorical features
+# table(), plot(table(()))
+# for numerical features
+# statistic, boxplot(), plot(density())
+```
+
+```{r}
+# simply analysis correlation between numeric features and prediction
+library(corrplot)
+correlation <- cor(train_data[,num_fea_names],use = "pairwise.complete.obs")
+
+# head(correlation)
+rowId <- apply(correlation, 1, function(x){
+  return (x[dim(correlation)[2]] > 0.5 | x[dim(correlation)[2]] < -0.5)
+})
+correlation[rowId,rowId]
+corrplot(correlation[rowId,rowId], method = "square")
+```
+
+```{r}
+# simply analysis correlation between numerical category features with prediction
+
+for(cat_num in num_cat_names){
+  boxplot(
+    subset(train_data, train_data[,cat_num] >= mean(train_data[,cat_num],na.rm = TRUE))$SalePrice,
+    subset(train_data, train_data[,cat_num] < mean(train_data[,cat_num],na.rm = TRUE))$SalePrice,
+    xlab = cat_num, ylab = "SalePrice"
+  )
+}
+
+```
+
+```{r}
+# simply analysis correlation between categorical features and prediction
+# library(tabplot)
+# library(lattice)
+# bwplot(Neighborhood ~ SalePrice, data = train_data)
+for(name in cat_fea_names){
+  plot(x = train_data[,name], y = train_data[,"SalePrice"],
+       xlab = name, ylab = "SalePrice")
+}
+
+```
+
+```{r}
+# feature engineering
+
+# how many years are these houses
+Age <- 2017 - train_data[,"YearBuilt"]
+cor(Age, train_data$SalePrice,use = "pairwise.complete.obs")
+
+# total Floor square feet
+tot_Flo_area <- train_data$X1stFlrSF + train_data$X2ndFlrSF
+cor(tot_Flo_area, train_data$SalePrice,use = "pairwise.complete.obs")
+
+# total bathroom
+#TotalBath
+totalBath <- with(train_data, BsmtFullBath + 0.5 * BsmtHalfBath + FullBath + 0.5 * HalfBath)
+with(train_data,cor(totalBath,SalePrice))
+
+# how many years garages are
+Age_gar <- 2017 - train_data$GarageYrBlt
+with(train_data,cor(Age_gar,SalePrice,use = "pairwise.complete.obs"))
+
+# total number of rooms
+tot_room <- train_data$TotRmsAbvGrd + train_data$BedroomAbvGr
+cor(tot_room, train_data$SalePrice,use = "pairwise.complete.obs")
+
+# percentage of living area to total square feet
+per_liv <- train_data$GrLivArea / tot_Flo_area
+cor(per_liv, train_data$SalePrice,use = "pairwise.complete.obs")
+
+# how many years house last since repairing
+rep_yea <- 2017 - train_data$YearRemodAdd
+cor(rep_yea, train_data$SalePrice,use = "pairwise.complete.obs")
+
+# hom many years houses last until repaire
+bef_rep_yea <- train_data$YearRemodAdd - train_data$YearBuilt
+cor(bef_rep_yea, train_data$SalePrice,use = "pairwise.complete.obs")
+```
+
+
