@@ -1,0 +1,76 @@
+---
+title: "Apply_methods"
+author: "Yihao Song(Allen)"
+date: "2017???5???16???"
+output: html_document
+---
+```{r}
+# object in apply can be matrix, array, data frame
+mat <- matrix(data = c(1:9), nrow = 3, byrow = TRUE)
+mat
+
+apply(mat, 1, function(x){
+  x * 2
+})
+
+apply(mat, 1, max)
+```
+
+```{r}
+# array: stacking multi matrixes
+arr <- array(data = c(1:30), dim = c(3,5,2))
+arr
+
+apply(arr, 2, function(x){
+  return(2 * x)
+})
+
+apply(arr, 2, min)
+```
+
+```{r}
+# data frame in apply
+df <- data.frame(c1 = c(1:3), c2 = c(2:4), c3 = c(3:5))
+df
+
+apply(df, 1, mean)
+```
+
+```{r}
+# attention: exclude factor variables for athemitical operations
+df$class <- as.factor(c(4:6))
+df
+# apply(df, 1, mean)
+apply(df[,-4], 1, mean)
+```
+
+```{r}
+# removing NA for athematical operations
+df[1,2] = NA
+apply(df[,-4], 2, mean)
+apply(df[,-4], 2, mean, na.rm = TRUE)
+```
+
+```{r}
+apply(df[,-4], 2, function(x){
+  x/sum(x, na.rm = TRUE)
+}
+      )
+```
+
+```{r}
+# lapply: the function to be applied to each element of X
+l <- list(a = matrix(data = c(1:9), nrow = 3), b = matrix(c(1:4), nrow = 2))
+l
+lapply(l, function(x){
+  x[,1]
+})
+```
+
+```{r}
+# lapply vs sapply
+vec <- c("this", "is", "my", "wife")
+lapply(vec, function(x){nchar(x)})
+sapply(vec, function(x){nchar(x)})
+```
+
