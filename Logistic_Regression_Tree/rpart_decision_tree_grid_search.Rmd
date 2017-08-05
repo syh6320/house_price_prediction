@@ -1,0 +1,122 @@
+---
+title: "homework4_2"
+author: "syh"
+date: "May 31, 2017"
+output: pdf_document
+---
+
+```{r}
+# in this section we would like to train a simple tree first
+# grid search for optimal combination of some parameters of rpart.control
+```
+
+```{r}
+# read all data (train + prediction) without missing value
+real_all_data <- read.csv(file = "H:/kaggle/houseprice/data/real_all_data_hybrid.csv",
+                          stringsAsFactors = FALSE)[,-c(1,2)]
+```
+
+```{r}
+# transform sale price to log sale price
+real_all_data[,"SalePrice"] <- log(real_all_data[,"SalePrice"])
+```
+
+```{r}
+# convert categorical ones to factors
+for(i in 1:dim(real_all_data)[2]){
+  if(is.character(real_all_data[,i])){
+    real_all_data[,i] <- as.factor(real_all_data[,i])
+  }
+}
+```
+
+
+```{r}
+# split all data into model and prediction
+model_data <- real_all_data[1:1460,]
+pre_x <- subset(real_all_data[-c(1:1460),], select = -SalePrice)
+```
+
+
+```{r}
+# split data into train and test
+set.seed(1)
+train_ind <- sample(1:dim(model_data)[1], size = dim(model_data)[1] * 0.7)
+train_data <- model_data[train_ind,]
+test_data <- model_data[-train_ind,]
+```
+
+
+```{r}
+# train a simple tree first
+library(rpart)
+
+forumla <- "SalePrice ~."
+# all_control <- NULL
+min_xerror <- Inf
+opt_tree <- NULL
+
+for(i in 1:30){
+  
+  seed.number = sample.int(10000, 1)[[1]]
+  set.seed(seed.number)
+  simple_tree <- rpart(formula = forumla, data = train_data, method = "anova",
+                       control = rpart.control(
+                          minsplit = sample(c(12, 21, 30, 39, 48), 1),
+                          cp = sample(c(0.1, 0.01, 0),1)
+                       )
+                     )
+  
+  # all_control<- rbind(all_control, unlist(control))
+  if(min(simple_tree$cptable[,"xerror"]) < min_xerror){
+    opt_tree <- simple_tree
+    min_xerror <- min(simple_tree$cptable[,"xerror"])
+  }
+}
+
+```
+
+
+```{r}
+opt_tree
+```
+
+```{r}
+printcp(opt_tree)
+```
+
+
+```{r}
+# find optimal cp
+cptable <- as.data.frame(opt_tree$cptable)
+opt_cp <- cptable[with(cptable, min(which(xerror - xstd <= min(xerror)))), "CP"]
+```
+
+```{r}
+# create a optimal tree with opt_cp
+opt_tree <- prune(tree = opt_tree, cp = opt_cp)
+```
+
+```{r}
+est_test_sale_price <- predict(object = opt_tree, newdata = test_data)
+```
+
+```{r}
+# sse
+sum((est_test_sale_price - test_data$SalePrice) ^ 2)
+```
+
+```{r}
+# let make a prediction
+pre_sale_price <- predict(object = opt_tree, newdata = pre_x)
+# 
+```
+
+```{r}
+result <- data.frame(Id = c(1461:2919), SalePrice = exp(pre_sale_price))
+
+write.csv(x = result, file = "H:/kaggle/houseprice/data/submission_4.csv",
+          row.names = FALSE)
+# Your submission scored 0.21641
+```
+

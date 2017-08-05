@@ -1,0 +1,150 @@
+---
+title: "homework4_5"
+author: "syh"
+date: "June 2, 2017"
+output: pdf_document
+---
+
+```{r}
+# in this section, we would like to use xgboost to predict sale price
+# attention: only matrix and factor are supported in xgboost
+```
+
+```{r}
+# read all data (train + prediction) without missing value
+real_all_data <- read.csv(file = "H:/kaggle/houseprice/data/real_all_data_hybrid.csv",
+                          stringsAsFactors = FALSE)[,-c(1,2)]
+```
+
+```{r}
+# transform sale price to log sale price
+real_all_data[,"SalePrice"] <- log(real_all_data[,"SalePrice"])
+```
+
+```{r}
+# 1. convert categorical ones to factors
+for(i in 1:dim(real_all_data)[2]){
+  if(is.character(real_all_data[,i])){
+    real_all_data[,i] <- as.factor(real_all_data[,i])
+  }
+}
+```
+
+```{r}
+# 2. convert independent features into matrix
+fea_mat <- model.matrix(~., data = subset(real_all_data, select = -SalePrice))
+```
+
+```{r}
+# 1. split all data into train and prediction
+
+model_x <- fea_mat[1:1460,]
+model_y <- real_all_data[1:1460, "SalePrice"]
+
+pre_x <- fea_mat[-c(1:1460),]
+
+# 2. split model data into train and test
+# seed <- sample.int(n = 10000, size = 1)
+# set.seed(seed)
+set.seed(2)
+train_ind <- sample(1:dim(model_x)[1], size = dim(model_x)[1] * 0.7)
+
+train_x <- model_x[train_ind,]
+train_y <- model_y[train_ind]
+
+test_x <- model_x[-train_ind,]
+test_y <- model_y[-train_ind]
+```
+
+
+```{r}
+# at first we use common parameter to train a simple xgboost model
+library(xgboost)
+
+set.seed(2)
+xgb <- xgboost(data = train_x, label = train_y, nrounds = 20, 
+               verbose = 0, nthread = 3, max_depth = 8, object = "reg:linear"
+               )
+```
+
+```{r}
+# let's look at importance of each featues
+importance <- xgb.importance(feature_names = colnames(train_x), model = xgb)
+importance
+
+```
+```{r}
+# visually look at first 15 most important features
+library(ggplot2)
+library(Ckmeans.1d.dp)
+xgb.ggplot.importance(importance_matrix = importance, top_n = 15)
+```
+
+```{r}
+# let's calculate the sse of this model on test data
+est_y <- predict(object = xgb, newdata = test_x)
+sqrt(mean((est_y - test_y) ^ 2))
+```
+
+
+```{r}
+# try to use caret, cross validation to find optimal combination of parameters.
+# set possible combinations of parameters
+library(caret)
+paraGrid <- expand.grid(
+            nrounds = c(200, 250, 300),
+            max_depth = c(3, 5, 10),
+            eta = c(0.05,0.1, 0.2),
+            gamma = 0,  # first 0
+            min_child_weight = c(10, 15, 20),
+            subsample = c(0.6, 0.7, 0.8, 0.9),
+            colsample_bytree = c(0.6, 0.7, 0.8)
+            )
+
+```
+
+```{r}
+# set train control
+xgb_Control <- trainControl(method = "repeatedcv", verboseIter = F, 
+                            number = 5,repeats = 2, 
+                            returnData = FALSE, allowParallel = TRUE
+                          )
+```
+
+
+```{r}
+# trian our model using cross validation for grid search for parameters
+
+gbm_train <- train(x = train_x, y = train_y, method = "xgbTree", 
+                   trControl = xgb_Control, tuneGrid = paraGrid)
+
+```
+
+
+```{r}
+rmse_order <- order(gbm_train$results$RMSE)
+head(gbm_train$result[rmse_order,])
+```
+
+```{r}
+# for now best parameters
+gbm_train$best
+```
+
+
+```{r}
+# let's make a estimate on test data
+est_y <- predict(object = gbm_train, newdata = test_x)
+sqrt(mean((est_y - test_y) ^ 2))
+```
+
+```{r}
+# make prediction
+pre_sale_price <- predict(object = gbm_train, newdata = pre_x)
+result <- data.frame(Id = c(1461:2919), SalePrice = exp(pre_sale_price))
+write.csv(x = result, file = "H:/kaggle/houseprice/data/submission_7.csv",
+          row.names = FALSE)
+# the score on kaggle is about 0.1349, not better than before.
+# I'm pretty sad now ...
+```
+
